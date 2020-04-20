@@ -20,18 +20,21 @@ along with MTPSD.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "mtpsd.h"
+#include "template_math_cpp.h"
+#include "ccomplex_functions.h"
 #include <cstdlib>      // needed for atexit to unload fftw properly
 #include <cstring>      // needed for memcpy
+#include <complex>      // needed for eig_coeff return
 
 /////////////////////////////////////////////////////////////////////
 //  Template Instantiations
 ////////////////////////////////////////////////////////////////////
 
 template  void eigenspecta<double>(double *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk, double *Sk);
-template  void eigencoeffs<double>(double *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk);
+//template  void eigencoeffs<double>(double *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk);
 
-template  void eigenspecta<fftw_complex>(fftw_complex *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk, double *Sk);
-template  void eigencoeffs<fftw_complex>(fftw_complex *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk);
+//template  void eigenspecta<fftw_complex>(fftw_complex *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk, double *Sk);
+//template  void eigencoeffs<fftw_complex>(fftw_complex *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk);
 
 template  class mtpsd<double>; 
 template  mtpsd<double>::mtpsd(double *data, uint_t n, double nW);
@@ -42,7 +45,7 @@ template  mtpsd<double>::~mtpsd();
 template  void mtpsd<double>::compute();
 template  double mtpsd<double>::operator()(uint_t ii);
 template  double mtpsd<double>::operator()(uint_t K, uint_t ii);
-template  fftw_complex mtpsd<double>::eig_coeff(uint_t K, uint_t ii);
+template  std::complex<double> mtpsd<double>::eig_coeff(uint_t K, uint_t ii);
 template  double mtpsd<double>::freq(uint_t ii);
 template  double mtpsd<double>::dof(uint_t ii);
 template  double mtpsd<double>::wt(uint_t kk, uint_t ii);
@@ -58,6 +61,8 @@ template  uint_t mtpsd<double>::size(int dim);
 template  const double *mtpsd<double>::pS();
 template  mtpsd_workspace mtpsd<double>::getinfo();
 
+
+/*
 template  class mtpsd<fftw_complex>; 
 template  mtpsd<fftw_complex>::mtpsd(fftw_complex *data, uint_t n, double nW);
 template  mtpsd<fftw_complex>::mtpsd(fftw_complex *data, mtpsd_workspace work);
@@ -82,10 +87,11 @@ template  uint_t mtpsd<fftw_complex>::length();
 template  uint_t mtpsd<fftw_complex>::size(int dim);
 template  const double *mtpsd<fftw_complex>::pS();
 template  mtpsd_workspace mtpsd<fftw_complex>::getinfo();
-
+*/
 /////////////////////////////////////////////////////////////////////
 //  MTPSD OBJECT
 /////////////////////////////////////////////////////////////////////
+
 
 void fix_workspace(mtpsd_workspace &work){
     
@@ -239,8 +245,8 @@ double mtpsd<T>::freq(uint_t ii){
 }
 
 template <class T>
-fftw_complex mtpsd<T>::eig_coeff(uint_t K, uint_t ii){
-    return Jk[ K* this->info.N + ii ];
+std::complex<double> mtpsd<T>::eig_coeff(uint_t K, uint_t ii){
+    return std::complex<double>(Jk[K*this->info.N+ii][0],Jk[K*this->info.N+ii][1]);
 }
 
 template <class T>
@@ -417,9 +423,10 @@ double mtpsd<T>::taper(uint_t k, uint_t i){
 //  Code
 /////////////////////////////////////////////////////////////////////
 
-template <class T>
-void eigencoeffs(T *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk){
-        
+template <>
+void eigencoeffs<double>(double *x, uint_t n, const double *tapers, const double *lambda, uint_t K, bool remove_mean, uint_t N, fftw_complex *Jk)
+{
+    typedef double T;
     T m=tmath::mean<T>(x,n);       //computes standard mean
     
     double tmp;             //temporary variable
@@ -449,16 +456,18 @@ void eigencoeffs(T *x, uint_t n, const double *tapers, const double *lambda, uin
         }
  
         for (uint_t jj=0; jj<n; jj++){
-            Jk[ii*N+jj]=x[jj]-wm;       //prepares for in-place FFT
+            Jk[ii*N+jj][0]=x[jj]-wm;       //prepares for in-place FFT
         }        
     }
     
     //Window the data
     for ( uint_t ii=0; ii<K; ii++){
         tmath::pw_mult<fftw_complex,double>(&Jk[ii*N], &tapers[ii*n], n, &Jk[ii*N] );
+
         //zero-pad rest of array
         for (uint_t jj=n; jj<N; jj++){
-            Jk[ii*N+jj]=0;
+            Jk[ii*N+jj][0]=0;
+            Jk[ii*N+jj][1]=0;
         }
         
     }
@@ -713,10 +722,11 @@ double confidence_factor(CONF_BOUND side, double p, double v){
     
 }
 
+
 double F_statistic(uint_t ii, fftw_complex *Jk, uint_t N, uint_t K, double *wk, uint_t nwk, double *h, uint_t n ){
  
     double ak, aH02=0, a2H02=0, sige2, Jkerr, wssq, tmp;
-    fftw_complex C=0, Jke;     // estimate of fourier coefficient at f (assuming line frequency)
+    std::complex<double> C=0, Jke;     // estimate of fourier coefficient at f (assuming line frequency)
     
     double *H0=new double[K];
     
@@ -727,7 +737,7 @@ double F_statistic(uint_t ii, fftw_complex *Jk, uint_t N, uint_t K, double *wk, 
         tmp=H0[jj]*H0[jj]*ak;
         aH02 += tmp;
         a2H02+= tmp*ak;
-        C += Jk[ii+jj*N]*ak*H0[jj];
+        C += std::complex<double>(Jk[ii+jj*N][0], Jk[ii+jj*N][0])*ak*H0[jj];
     }
     
     C=C/aH02;   // estimated fourier coefficient
@@ -738,7 +748,7 @@ double F_statistic(uint_t ii, fftw_complex *Jk, uint_t N, uint_t K, double *wk, 
         iwk = jj*nwk + ii%nwk;
         //H0 = sum<double>( &h[jj*n], n ) ;      //re-calculates in order to prevent creating an array
         Jke = C*H0[jj];
-        Jkerr = cabs(Jk[ii+jj*N]-Jke);
+        Jkerr = cabs(std::complex<double>(Jk[ii+jj*N][0], Jk[ii+jj*N][1])-Jke);
         sige2 += wk[iwk]*Jkerr*Jkerr;   //weighted error
         wssq += wk[iwk]*wk[iwk];
     }

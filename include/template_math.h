@@ -38,6 +38,7 @@ along with MTPSD.  If not, see <http://www.gnu.org/licenses/>.
 #define MTPSD_TEMPLATE_MATH
 
 #include <complex.h>
+#include "ccomplex_functions.h"
 
 namespace tmath {
 
@@ -60,7 +61,6 @@ template <class A, class B> void pw_mult(const A *a, const B *b, unsigned int n,
     
     for (unsigned int ii=0; ii<n; ii++)
         ab[ii]=a[ii]*b[ii];
-    
 }
 
 //dot product
@@ -117,6 +117,4 @@ template <class T> double mom2(const T *a, unsigned int n){
 
 }
 
-#else
-#warning template_math already loaded
-#endif
+#endif // MTPSD_TEMPLATE_MATH

@@ -34,10 +34,11 @@ along with MTPSD.  If not, see <http://www.gnu.org/licenses/>.
 #include "dpss.h"           // methods for computing dpss (so user doesn't have to include it manually)
 #include "applied_stats.h"  // chi_squared statistics for confidence intervals
 
-#include <complex.h>
-#ifndef complex
-#define complex             // in msys, complex.h doesn't define "complex", needed by fftw
-#endif
+#include <complex>
+//#include <complex.h>
+//#ifndef complex
+//#define complex             // in msys, complex.h doesn't define "complex", needed by fftw
+//#endif
 #include <fftw3.h>
 #include <cmath>        
 
@@ -88,7 +89,7 @@ public:
     
     double operator()(uint_t ii);            // returns the ith value of the spectrum estimate
     double operator()(uint_t k, uint_t ii);  // returns the ith value of eigenspectrum k
-    fftw_complex eig_coeff(uint_t k, uint_t ii);   //returns the ith value of eigencoefficient k (Jk) 
+    std::complex<double> eig_coeff(uint_t k, uint_t ii);   //returns the ith value of eigencoefficient k (Jk) 
     
     double freq(uint_t ii);                 // returns ith frequency
     
